@@ -1,0 +1,350 @@
+// TerraSmart — Esquema de base de datos
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Plan {
+  BASIC
+  PREMIUM
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum AlertType {
+  LOW_MOISTURE
+  HIGH_MOISTURE
+  DEVICE_OFFLINE
+  BATTERY_LOW
+  FERTILIZATION
+}
+
+enum Severity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum WateringSource {
+  MANUAL
+  ZONE
+  AUTOMATIC
+  SCHEDULE
+  VACATION
+}
+
+enum WateringStatus {
+  DONE
+  RUNNING
+  SKIPPED
+}
+
+enum RuleTrigger {
+  MOISTURE_BELOW
+  SCHEDULE
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+// ---------------------------------------------------------------- modelos
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  plan         Plan     @default(BASIC)
+  planRenewsAt DateTime?
+  vacationMode Boolean  @default(false)
+  vacationFrom DateTime?
+  vacationTo   DateTime?
+  createdAt    DateTime @default(now())
+
+  plants         Plant[]
+  devices        Device[]
+  zones          Zone[]
+  alerts         Alert[]
+  posts          ForumPost[]
+  comments       Comment[]
+  waterings      WateringEvent[]
+  automations    AutomationRule[]
+  chatMessages   ChatMessage[]
+  reports        AiReport[]
+  payments       Payment[]
+
+  @@map("users")
+}
+
+model Device {
+  id         String       @id @default(cuid())
+  code       String       @unique
+  name       String
+  model      String       @default("TerraSmart v1")
+  status     DeviceStatus @default(ONLINE)
+  battery    Int          @default(100)
+  firmware   String       @default("1.0.0")
+  lastSeenAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plants   Plant[]
+  readings Reading[]
+
+  @@index([userId])
+  @@map("devices")
+}
+
+model Zone {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#2E8B5F")
+  icon      String   @default("home")
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plants      Plant[]
+  waterings   WateringEvent[]
+  automations AutomationRule[]
+
+  @@index([userId])
+  @@map("zones")
+}
+
+model Plant {
+  id                String    @id @default(cuid())
+  name              String
+  species           String
+  location          String
+  notes             String?
+  imageUrl          String?
+  moistureMin       Int       @default(30)
+  moistureMax       Int       @default(70)
+  wateringEveryDays Int       @default(3)
+  registeredAt      DateTime  @default(now())
+  lastWateredAt     DateTime?
+  createdAt         DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deviceId String?
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  readings       Reading[]
+  alerts         Alert[]
+  fertilizations FertilizationTask[]
+  waterings      WateringEvent[]
+  automations    AutomationRule[]
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([zoneId])
+  @@map("plants")
+}
+
+model Reading {
+  id          String   @id @default(cuid())
+  moisture    Int
+  temperature Float?
+  battery     Int?
+  recordedAt  DateTime @default(now())
+
+  plantId String
+  plant   Plant  @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  deviceId String?
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([plantId, recordedAt])
+  @@index([recordedAt])
+  @@map("readings")
+}
+
+model Alert {
+  id        String    @id @default(cuid())
+  type      AlertType
+  severity  Severity  @default(WARNING)
+  title     String
+  message   String
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plantId String?
+  plant   Plant?  @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([plantId])
+  @@map("alerts")
+}
+
+model FertilizationTask {
+  id          String    @id @default(cuid())
+  product     String
+  dose        String?
+  scheduledAt DateTime
+  doneAt      DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  plantId String
+  plant   Plant  @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@index([plantId, scheduledAt])
+  @@map("fertilization_tasks")
+}
+
+model WateringEvent {
+  id        String         @id @default(cuid())
+  source    WateringSource @default(MANUAL)
+  status    WateringStatus @default(DONE)
+  minutes   Int
+  liters    Float
+  startedAt DateTime       @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plantId String?
+  plant   Plant?  @relation(fields: [plantId], references: [id], onDelete: SetNull)
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([plantId, startedAt])
+  @@index([zoneId, startedAt])
+  @@map("watering_events")
+}
+
+model AutomationRule {
+  id         String      @id @default(cuid())
+  name       String
+  trigger    RuleTrigger @default(MOISTURE_BELOW)
+  threshold  Int?
+  minutes    Int         @default(5)
+  hour       Int?
+  weekdays   Int[]       @default([])
+  enabled    Boolean     @default(true)
+  lastRunAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plantId String?
+  plant   Plant?  @relation(fields: [plantId], references: [id], onDelete: SetNull)
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("automation_rules")
+}
+
+model ForumPost {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  tag       String   @default("general")
+  imageUrl  String?
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comments Comment[]
+
+  @@index([createdAt])
+  @@map("forum_posts")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  postId String
+  post   ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("comments")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      ChatRole
+  content   String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+model AiReport {
+  id          String   @id @default(cuid())
+  period      String
+  summary     String
+  highlights  String[]
+  generatedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+  @@map("ai_reports")
+}
+
+/// Cobros de la pasarela de pago sandbox (no se guarda ningún dato sensible
+/// de la tarjeta: solo marca y últimos 4 dígitos).
+model Payment {
+  id          String   @id @default(cuid())
+  reference   String   @unique
+  gateway     String   @default("TerraPay Sandbox")
+  amount      Int
+  currency    String   @default("MXN")
+  status      String   @default("PAID")
+  brand       String
+  last4       String
+  holder      String
+  periodStart DateTime @default(now())
+  periodEnd   DateTime
+  createdAt   DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("payments")
+}

@@ -1,0 +1,38 @@
+{
+  "name": "TerraSmart",
+  "short_name": "TerraSmart",
+  "description": "Monitoreo de humedad, riego automático y asistente con IA para tus plantas.",
+  "lang": "es-MX",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F6F8F6",
+  "theme_color": "#14432E",
+  "categories": ["lifestyle", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Mis plantas", "url": "/plantas" },
+    { "name": "Alertas", "url": "/alertas" },
+    { "name": "Asistente IA", "url": "/asistente" }
+  ]
+}
