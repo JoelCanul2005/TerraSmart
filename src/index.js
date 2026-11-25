@@ -1,8 +1,6 @@
-import { createApp } from './app.js';
+import app from './app.js';
 import { config } from './config.js';
 import { prisma } from './db.js';
-
-const app = createApp();
 
 export default app;
 
