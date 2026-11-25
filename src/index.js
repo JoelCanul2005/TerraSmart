@@ -4,18 +4,22 @@ import { prisma } from './db.js';
 
 const app = createApp();
 
-const server = app.listen(config.port, () => {
-  console.log(`  TerraSmart  →  http://localhost:${config.port}`);
-  console.log(`\n  TerraSmart API  →  http://localhost:${config.port}/api/health`);
-  console.log(`  Entorno: ${process.env.NODE_ENV ?? 'development'}\n`);
-});
+export default app;
 
-const shutdown = async () => {
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
+if (!process.env.VERCEL) {
+  const server = app.listen(config.port, () => {
+    console.log(`  TerraSmart  →  http://localhost:${config.port}`);
+    console.log(`\n  TerraSmart API  →  http://localhost:${config.port}/api/health`);
+    console.log(`  Entorno: ${process.env.NODE_ENV ?? 'development'}\n`);
   });
-};
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+  const shutdown = async () => {
+    server.close(async () => {
+      await prisma.$disconnect();
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
